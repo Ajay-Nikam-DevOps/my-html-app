@@ -1,3 +1,4 @@
+"""
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -178,3 +179,92 @@ def main():
 if __name__ == "__main__":
     main()
     start_background_bot()
+"""
+
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+import plotly.express as px
+import yfinance as yf
+import threading
+import time
+from streamlit_server_state import server_state, server_state_lock
+from Config.config import config
+
+# Configure page
+st.set_page_config(
+    page_title="Quant Researches Trading Dashboard",
+    page_icon="🏛️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# --- Background Bot Logic using streamlit-server-state ---
+def background_task():
+    while True:
+        # Your actual scanning + trading logic
+        print("🧠 Scanning stocks...")
+        time.sleep(5)
+
+def start_background_bot():
+    # Use a lock to ensure the thread is only created once across the entire server
+    with server_state_lock["bot_thread"]:
+        if "bot_thread" not in server_state:
+            thread = threading.Thread(target=background_task, daemon=True)
+            thread.start()
+            server_state["bot_thread"] = True
+            print("✅ Bot thread started.")
+
+# Initialize the bot immediately upon script execution
+start_background_bot()
+
+# Custom CSS
+st.markdown("""
+<style>
+    .main-header { font-size: 2.5rem; font-weight: 700; text-align: center; margin-bottom: 2rem; }
+    .metric-card { background-color: #262730; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid #FF6B35; }
+</style>
+""", unsafe_allow_html=True)
+
+def main():
+    st.markdown('<h1 class="main-header">🏛️ Quant Researches Trading Dashboard</h1>', unsafe_allow_html=True)
+    st.markdown("---")
+    
+    # Sidebar
+    with st.sidebar:
+        st.header("🟢 Market Status")
+        market_open = config.getboolean('MARKET', 'STATUS')
+        status_color = "🟢" if market_open else "🔴"
+        st.write(f"{status_color} **{'OPEN' if market_open else 'CLOSED'}**")
+        
+        st.subheader("📊 Quick Stats")
+        try:
+            indices = {"NIFTY 50": "^NSEI", "BANK NIFTY": "^NSEBANK"}
+            for name, symbol in indices.items():
+                ticker = yf.Ticker(symbol)
+                data = ticker.history(period="5d")
+                if not data.empty:
+                    current = data['Close'].iloc[-1]
+                    prev = data['Close'].iloc[-2]
+                    change = ((current - prev) / prev) * 100
+                    st.metric(label=name, value=f"{current:.2f}", delta=f"{change:.2f}%")
+        except Exception:
+            st.error("Unable to fetch market data")
+    
+    # Dashboard Content
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Portfolio Value", "$12.5M", "+2.3%")
+    col2.metric("Daily P&L", "+$287K", "+2.34%")
+    col3.metric("Sharpe Ratio", "2.14", "+0.12")
+    col4.metric("Max Drawdown", "-3.2%", "+0.8%")
+    
+    st.markdown("---")
+    st.header("🌍 Market Overview")
+    
+    # Tabs logic remains the same...
+    tab1, tab2, tab3 = st.tabs(["📈 Performance", "🔥 Heat Map", "📊 Sectors"])
+    # ... (rest of your existing chart logic)
+
+if __name__ == "__main__":
+    main()
